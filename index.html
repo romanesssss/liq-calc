@@ -13,8 +13,8 @@
 
 [data-theme="light"]{
   --bg:#f5f5f5;--bg2:#fff;--fg:#000;
-  --b1:#e0e0e0;--b2:#d0d0d0;--b3:#bbb;
-  --dim:#999;--dim2:#bbb;
+  --b1:#d5d5d5;--b2:#c5c5c5;--b3:#aaa;
+  --dim:#111;--dim2:#666;
   --card:#fff;--nav:#fff;
   --input-border:#ccc;--input-border-focus:#000;
   --badge-bg:#f0f0f0;
@@ -38,7 +38,7 @@
   --btn-s-border:#333;--btn-s-fg:#666;
 }
 
-:root{--mono:'Courier New',monospace;--r:8px;}
+:root{--mono:-apple-system,'SF Pro Text','SF Pro Display',system-ui,sans-serif;--r:8px;}
 html,body{height:100%;background:var(--bg);color:var(--fg);font-family:var(--mono);-webkit-font-smoothing:antialiased;overscroll-behavior:none;font-size:14px;transition:background .2s,color .2s}
 body{display:flex;flex-direction:column;min-height:100dvh}
 ::-webkit-scrollbar{width:0}
@@ -153,9 +153,9 @@ input[type=number]{-moz-appearance:textfield}
 .setup{padding:20px 16px;display:flex;flex-direction:column;gap:12px}
 .step{display:flex;gap:10px;padding:10px 12px;border:1px solid var(--b1);border-radius:6px;background:var(--card);transition:background .2s,border-color .2s}
 .step-n{font-size:11px;color:var(--dim);min-width:16px}
-.step-t{font-size:11px;color:var(--dim);line-height:1.5}
+.step-t{font-size:11px;color:var(--fg);line-height:1.5}
 .step-t b{color:var(--fg)}
-.warn{padding:10px 12px;border:1px solid var(--warn-border);border-radius:6px;font-size:10px;color:var(--dim);line-height:1.6;background:var(--warn-bg);transition:all .2s}
+.warn{padding:10px 12px;border:1px solid var(--warn-border);border-radius:6px;font-size:10px;color:var(--fg);line-height:1.6;background:var(--warn-bg);transition:all .2s}
 
 select{background:var(--card);border:1px solid var(--b2);color:var(--fg);font-family:var(--mono);font-size:13px;padding:7px 10px;border-radius:6px;width:100%;outline:none;-webkit-appearance:none;transition:background .2s,border-color .2s}
 select:focus{border-color:var(--input-border-focus)}
@@ -408,28 +408,12 @@ function rmSim(id){
 // ── Settings ───────────────────────────────────────────────────────────────────
 function renderSettings(){
   document.getElementById('scrollArea').innerHTML=`<div class="setup fi">
-    <div style="font-size:11px;letter-spacing:.15em;text-transform:uppercase;margin-bottom:4px">API КЛЮЧИ</div>
-    <div style="font-size:11px;color:var(--dim);line-height:1.6">Read-only доступ к Bybit. Ключи хранятся локально.</div>
-    <div style="display:flex;flex-direction:column;gap:6px">
-      <div class="step"><span class="step-n">1.</span><span class="step-t">Bybit → Аккаунт → <b>API Менеджмент</b></span></div>
-      <div class="step"><span class="step-n">2.</span><span class="step-t">Создай ключ → <b>API Transaction</b> → только <b>Read Only</b></span></div>
-      <div class="step"><span class="step-n">3.</span><span class="step-t">Вставь ключи ниже</span></div>
-    </div>
-    <div class="warn">Запросы идут напрямую в Bybit API. Никаких сторонних серверов.</div>
     <div class="card">
       <div class="field" style="margin-bottom:14px"><label>API KEY</label><div class="fw"><input type="text" id="ki" placeholder="xxxxxxxxxxxxxxx" value="${S.apiKey}" autocomplete="off" autocorrect="off" spellcheck="false" style="padding-right:0;font-size:12px"/></div></div>
       <div class="field"><label>API SECRET</label><div class="fw"><input type="password" id="si" placeholder="••••••••••••••" value="${S.apiSecret}" autocomplete="off" style="padding-right:0;font-size:12px"/></div></div>
     </div>
     <button class="btn-p" onclick="saveKeys()">СОХРАНИТЬ</button>
     ${S.apiKey?`<button class="btn-s" onclick="clearKeys()">УДАЛИТЬ КЛЮЧИ</button>`:''}
-    <div style="padding-top:14px;border-top:1px solid var(--b1)">
-      <div class="lbl" style="margin-bottom:8px">УСТАНОВКА НА IPHONE</div>
-      <div style="font-size:11px;color:var(--dim);line-height:1.9">
-        1. Открой файл в <b style="color:var(--fg)">Safari</b><br>
-        2. Нажми <b style="color:var(--fg)">Поделиться</b> → <b style="color:var(--fg)">«На экран "Домой"»</b><br>
-        3. Нажми <b style="color:var(--fg)">Добавить</b>
-      </div>
-    </div>
   </div>`;
 }
 
