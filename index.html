@@ -104,6 +104,27 @@ input[type=number]{-moz-appearance:textfield}
 .wl{font-size:10px;font-weight:600;color:var(--dim2);letter-spacing:.06em}
 .wv{font-size:20px;font-weight:300;letter-spacing:-.01em}
 
+/* Margin input card */
+.margin-card{background:var(--card);border:1px solid var(--b1);border-radius:var(--r);padding:12px 14px;margin-bottom:8px;transition:all .2s}
+.margin-card.active{border-color:var(--up)}
+.margin-inner{display:flex;align-items:center;gap:10px}
+.margin-icon{font-size:14px;color:var(--dim2);flex-shrink:0;transition:color .2s}
+.margin-card.active .margin-icon{color:var(--up)}
+.margin-field{flex:1;position:relative}
+.margin-field input{width:100%;background:transparent;border:none;border-bottom:1px solid var(--input-border);color:var(--fg);font-family:var(--font);font-size:15px;font-weight:400;padding:4px 50px 4px 0;outline:none;transition:border-color .15s;-webkit-appearance:none;appearance:none}
+.margin-field input:focus{border-color:var(--input-border-focus)}
+.margin-field input::placeholder{color:var(--b3)}
+.margin-sfx{position:absolute;right:0;top:50%;transform:translateY(-50%);font-size:11px;color:var(--dim2);pointer-events:none;font-weight:500}
+.margin-new-bal{font-size:11px;color:var(--dim2);font-weight:500;margin-top:6px;text-align:right;transition:color .2s}
+.margin-card.active .margin-new-bal{color:var(--up)}
+.margin-reset{background:none;border:1px solid var(--b2);border-radius:5px;color:var(--dim2);font-family:var(--font);font-size:10px;font-weight:500;padding:3px 8px;cursor:pointer;flex-shrink:0;transition:all .15s}
+.margin-reset:active{border-color:var(--fg);color:var(--fg)}
+
+/* Liq sim delta row inside position card */
+.liq-sim-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--b1)}
+.liq-sim-lbl{font-size:10px;color:var(--dim2);font-weight:500}
+.liq-sim-val{font-size:14px;font-weight:600;letter-spacing:-.01em}
+
 /* Fields */
 .field{display:flex;flex-direction:column;gap:3px}
 .field label{font-size:10px;font-weight:600;color:var(--dim2);letter-spacing:.06em;text-transform:uppercase}
@@ -210,13 +231,14 @@ const S = {
   apiKey: localStorage.getItem('bk') || '',
   apiSecret: localStorage.getItem('bs') || '',
   positions: [], walletBalance: 0, loading: false, page: 'positions',
-  prices: {}, // symbol -> {price, prevPrice}
+  prices: {},
   simDir: 'SHORT', simSymbol: 'BTCUSDT',
   simEntries: [{id:1, price:'', qty:'', leverage:'10'}],
+  extraMargin: 0, // additional margin for simulation on positions page
 };
 const MM = 0.005;
 
-// ── WebSocket (public, no auth needed) ────────────────────────────────────────
+// ── WebSocket ──────────────────────────────────────────────────────────────────
 let ws = null;
 let wsReconnectTimer = null;
 let wsSubscribed = [];
@@ -259,7 +281,6 @@ function setWsDot(state) {
 }
 
 function updatePriceDom(sym, price, prev) {
-  // Update price display on position cards
   const el = document.getElementById('price-' + sym);
   if (el) {
     el.textContent = '$' + fp(price);
@@ -278,7 +299,6 @@ function updatePriceDom(sym, price, prev) {
       chEl.className = 'pos-price-change ' + (pct >= 0 ? 'up' : 'down');
     }
   }
-  // Update sim result if on simulator page
   if (S.page === 'simulator') updateSimResult();
 }
 
@@ -314,7 +334,6 @@ async function refreshPositions() {
     S.positions = (pd.result.list || []).filter(p => parseFloat(p.size) > 0);
     const coin = wd.result.list?.[0]?.coin?.find(c => c.coin === 'USDT');
     S.walletBalance = parseFloat(coin?.walletBalance || 0);
-    // Subscribe to price feeds for all open positions
     const syms = [...new Set(S.positions.map(p => p.symbol))];
     if (syms.length) wsSubscribe(syms);
     if (S.page === 'positions') renderPositions();
@@ -386,18 +405,51 @@ function renderPositions() {
     area.innerHTML = `<div class="sec fi"><div class="empty"><div style="font-size:2rem;margin-bottom:10px">○</div><div class="empty-t">Нет открытых позиций</div></div></div>`;
     return;
   }
+
+  const em = S.extraMargin;
+  const wb = S.walletBalance;
+  const wbSim = wb + em;
+  const hasMargin = em > 0;
+
   let h = `<div class="sec fi">`;
-  if (S.walletBalance > 0) h += `<div class="wallet-row"><span class="wl">БАЛАНС</span><span class="wv">$${f(S.walletBalance, 0)}</span></div>`;
+
+  // Wallet balance row
+  if (wb > 0) {
+    h += `<div class="wallet-row"><span class="wl">БАЛАНС</span><span class="wv">$${f(wb, 0)}${hasMargin ? ` <span style="font-size:14px;color:var(--up);font-weight:500">→ $${f(wbSim, 0)}</span>` : ''}</span></div>`;
+  }
+
+  // Extra margin input
+  h += `<div class="margin-card${hasMargin ? ' active' : ''}" id="marginCard">
+    <div class="lbl" style="margin-bottom:6px">ДОБАВИТЬ МАРЖУ</div>
+    <div class="margin-inner">
+      <span class="margin-icon">＋</span>
+      <div class="margin-field">
+        <input type="number" inputmode="decimal" id="extraMarginInput" placeholder="0" value="${em || ''}"/>
+        <span class="margin-sfx">USDT</span>
+      </div>
+      ${hasMargin ? `<button class="margin-reset" onclick="clearExtraMargin()">Сброс</button>` : ''}
+    </div>
+    ${hasMargin ? `<div class="margin-new-bal">Новый баланс: $${f(wbSim, 2)}</div>` : ''}
+  </div>`;
+
+  // Position cards
   S.positions.forEach(p => {
     const ap = parseFloat(p.avgPrice), sz = parseFloat(p.size), lv = parseFloat(p.leverage), pnl = parseFloat(p.unrealisedPnl);
-    const liq = liqFromPos(p, S.walletBalance);
+    const liq = liqFromPos(p, wb);
     const d = distPct(liq, ap, p.side);
     const danger = d !== null && d < 8;
     const sym = p.symbol.replace('USDT', '');
     const curPrice = S.prices[p.symbol]?.price;
     const pricePct = curPrice ? (p.side === 'Sell' ? (ap - curPrice) / ap * 100 : (curPrice - ap) / ap * 100) : null;
 
-    h += `<div class="card fi" style="${danger ? 'border-color:var(--down);' : ''}">
+    // Simulated liq with extra margin
+    const liqNew = hasMargin ? liqFromPos(p, wbSim) : null;
+    const dNew = liqNew ? distPct(liqNew, ap, p.side) : null;
+    const dangerNew = dNew !== null && dNew < 8;
+    const liqDelta = liqNew ? Math.abs(liqNew - liq) : null;
+    const liqBetter = liqNew ? (p.side === 'Sell' ? liqNew > liq : liqNew < liq) : null;
+
+    h += `<div class="card fi" style="${(hasMargin ? dangerNew : danger) ? 'border-color:var(--down);' : ''}">
       <div class="pos-header">
         <div class="pos-left">
           <div class="pos-sym">${sym}/USDT</div>
@@ -413,21 +465,49 @@ function renderPositions() {
       </div>
       <div class="liq-row">
         <span class="liq-lbl">ЛИКВИДАЦИЯ</span>
-        <span class="liq-val ${danger ? 'liq-danger blink' : ''}">$${fp(liq)}</span>
+        <span class="liq-val ${danger ? 'liq-danger blink' : ''}" id="liq-${p.symbol}">$${fp(liq)}</span>
       </div>
+      ${hasMargin ? `
+      <div class="liq-sim-row">
+        <span class="liq-sim-lbl">ПОСЛЕ ДОБАВЛЕНИЯ</span>
+        <span class="liq-sim-val ${dangerNew ? 'down' : 'up'}" id="liqsim-${p.symbol}">$${fp(liqNew)}</span>
+      </div>
+      <div class="liq-sim-row">
+        <span class="liq-sim-lbl">ИЗМЕНЕНИЕ</span>
+        <span class="liq-sim-val ${liqBetter ? 'up' : 'down'}">
+          ${liqBetter ? '↑' : '↓'} ${liqBetter ? '+' : '−'}$${fp(liqDelta)} (${dNew !== null ? f(dNew, 1) : '—'}%)
+        </span>
+      </div>` : ''}
       <div class="pos-stats">
         <div><div class="stat-lbl">СР. ЦЕНА</div><div class="stat-val">$${fp(ap)}</div></div>
         <div><div class="stat-lbl">ОБЪЁМ</div><div class="stat-val">${f(sz, 4)} ${sym}</div></div>
         <div><div class="stat-lbl">PNL</div><div class="stat-val ${pnl >= 0 ? 'up' : 'down'}">${pnl >= 0 ? '+' : ''}${f(pnl, 2)}$</div></div>
       </div>
       <div class="bar-wrap">
-        <div class="bar-meta"><span>ДО ЛИКВИДАЦИИ</span><span>${d !== null ? f(d, 1) + '%' : '—'}</span></div>
-        <div class="bar-bg"><div class="bar-fill" style="width:${d !== null ? Math.min(d / 30 * 100, 100) : 0}%"></div></div>
+        <div class="bar-meta"><span>ДО ЛИКВИДАЦИИ</span><span id="bardist-${p.symbol}">${hasMargin ? f(dNew, 1) : (d !== null ? f(d, 1) : '—')}%</span></div>
+        <div class="bar-bg"><div class="bar-fill" id="barfill-${p.symbol}" style="width:${(hasMargin ? dNew : d) !== null ? Math.min((hasMargin ? dNew : d) / 30 * 100, 100) : 0}%"></div></div>
       </div>
-      ${danger ? '<div style="margin-top:8px;font-size:10px;font-weight:600;color:var(--down);text-align:center;letter-spacing:.04em">⚠ ЛИКВИДАЦИЯ БЛИЗКО</div>' : ''}
+      ${(hasMargin ? dangerNew : danger) ? '<div style="margin-top:8px;font-size:10px;font-weight:600;color:var(--down);text-align:center;letter-spacing:.04em">⚠ ЛИКВИДАЦИЯ БЛИЗКО</div>' : ''}
     </div>`;
   });
   area.innerHTML = h + '</div>';
+
+  // Bind margin input
+  const mi = document.getElementById('extraMarginInput');
+  if (mi) {
+    mi.addEventListener('input', (e) => {
+      S.extraMargin = parseFloat(e.target.value) || 0;
+      renderPositions();
+      // Restore focus and cursor position
+      const inp = document.getElementById('extraMarginInput');
+      if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; }
+    });
+  }
+}
+
+function clearExtraMargin() {
+  S.extraMargin = 0;
+  renderPositions();
 }
 
 // ── Simulator ──────────────────────────────────────────────────────────────────
@@ -445,7 +525,6 @@ function renderSimulator() {
     </div>`;
   });
 
-  // Current price for selected symbol
   const curPrice = S.prices[S.simSymbol]?.price;
 
   area.innerHTML = `<div class="sec fi">
@@ -468,7 +547,6 @@ function renderSimulator() {
     <div class="card" id="simResult" style="margin-top:8px"></div>
   </div>`;
 
-  // Subscribe to selected symbol price
   wsSubscribe([S.simSymbol, ...S.positions.map(p => p.symbol)]);
 
   document.getElementById('simSymSel').onchange = e => { S.simSymbol = e.target.value; renderSimulator(); };
@@ -495,7 +573,6 @@ function updateSimResult() {
   const delta = liqNew && liqCur ? (S.simDir === 'SHORT' ? liqNew - liqCur : liqCur - liqNew) : null;
   const curPrice = S.prices[S.simSymbol]?.price;
 
-  // Update simCurPrice if it exists (without re-render)
   const scp = document.getElementById('simCurPrice');
   if (scp && curPrice) scp.textContent = '$' + fp(curPrice);
 
